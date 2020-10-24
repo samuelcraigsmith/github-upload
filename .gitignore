@@ -1,0 +1,5 @@
+# Distribution and packaging
+*.egg-info/ 
+
+# Byte-compiled / optimized / DLL files
+qcext/__pycache__/ 
