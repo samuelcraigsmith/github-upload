@@ -465,8 +465,10 @@ class Color666NoisyReadoutZ(Color666ReadoutZ):
                     get_list[colour].append(neighbour) 
                     assigned_unvisited.append(neighbour) 
 
-        error_support = min(black, red, key=lambda list_: len(list_))      
-        return len(error_support)%2 
+        error_support = min(black, red, key=lambda list_: len(list_)) # list of sites represented as tuples (i, j) 
+        error_support = np.array([1 if site in error_support else 0 for _, site in enumerate(code.ordered_qubits)]) # binary arrary 
+        logical_support = support(self.conserved_logicals(code)[0]) 
+        return np.count_nonzero(error_support & logical_support)%2 # binary array giving corrections to logical operator measurement outcomes. 
 
     @property 
     def label(): 
@@ -479,9 +481,13 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
     """Implements run_once and run_once_ftp functions."""
 
     # generate step_error, step_syndrome and step_measurement_error for each time step
-    step_errors, step_syndromes, step_measurement_errors = [], [], []
     residual_error = np.zeros(2*code.n_k_d[0], dtype=int) 
-    for _ in range(num_cycles): 
+
+    for _ in range(num_cycles):  
+        step_errors, step_syndromes, step_measurement_errors = [], [], []
+
+        # print("Residual error:") # REMOVE
+        # print(code.ascii_art(pauli=code.new_pauli(bsf=residual_error))) # REMOVE
         for _ in range(time_steps):
             # step_error: random e rror based on error probability
             step_error = error_model.generate(code, error_probability, rng)
@@ -500,6 +506,7 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
             else:
                 step_measurement_error = np.zeros(step_syndrome.shape, dtype=int)
             step_measurement_errors.append(step_measurement_error)
+
         if logger.isEnabledFor(logging.DEBUG): # why bother checking this? 
             logger.debug('run: step_errors={}'.format(step_errors))
             logger.debug('run: step_syndromes={}'.format(step_syndromes))
@@ -507,8 +514,15 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
 
         # error: sum of errors at each time step
         error = np.bitwise_xor.reduce([residual_error] + step_errors)
+        # print("Residual error with new error") # REMOVE
+        # print(code.ascii_art(pauli=code.new_pauli(bsf=error))) # REMOVE
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug('run: error={}'.format(error))
+
+        # # REMOVE THIS BLOCK 
+        # for i,m in enumerate(step_measurement_errors): 
+        #     print("The {}th measurement error (only one measurement error expected).".format(i)) 
+        #     print(code.ascii_art(syndrome=m)) 
 
         # syndrome: apply measurement_error at times t-1 and t to syndrome at time t 
         step_measurement_errors.append(np.zeros(step_syndrome.shape, dtype=int)) # ensure smooth t=0 bc 
@@ -520,6 +534,8 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
         syndrome = np.array(syndrome)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug('run: syndrome={}'.format(syndrome))
+        # print("Syndrome:") # REMOVE
+        # print(code.ascii_art(syndrome=syndrome[0])) # REMOVE
 
         # decoding: boolean or best match recovery operation based on decoder
         ctx = {'error_model': error_model, 'error_probability': error_probability, 'error': error,
@@ -539,6 +555,8 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
         else:
             # otherwise, treat decoder return value as recovery operation
             recovery = decoding
+            # print("Recovery:") # REMOVE
+            # print(code.ascii_art(pauli=code.new_pauli(bsf=recovery))) # REMOVE 
             # recovered code
             residual_error = recovery ^ error
 
