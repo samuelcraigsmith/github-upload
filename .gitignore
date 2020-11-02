@@ -1,5 +1,14 @@
 # Distribution and packaging
 *.egg-info/ 
+build/ 
+dist/ 
 
 # Byte-compiled / optimized / DLL files
 qcext/__pycache__/ 
+
+# Virtual environment 
+venv 
+qecsimext 
+
+# Testing 
+scratch

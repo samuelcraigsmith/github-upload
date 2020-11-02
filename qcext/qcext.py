@@ -20,8 +20,8 @@ from qecsim.app import _add_rate_statistics
 
 import qcext 
 
-logging.basicConfig() 
 logger = logging.getLogger(__name__)
+
 
 ######################################################### USEFUL FUNCTIONS ##################################################
 
@@ -468,7 +468,7 @@ class Color666NoisyReadoutZ(Color666ReadoutZ):
         error_support = min(black, red, key=lambda list_: len(list_)) # list of sites represented as tuples (i, j) 
         error_support = np.array([1 if site in error_support else 0 for _, site in enumerate(code.ordered_qubits)]) # binary arrary 
         logical_support = support(self.conserved_logicals(code)[0]) 
-        return np.count_nonzero(error_support & logical_support)%2 # binary array giving corrections to logical operator measurement outcomes. 
+        return np.array(np.count_nonzero(error_support & logical_support)%2) # binary array giving corrections to logical operator measurement outcomes. 
 
     @property 
     def label(): 
@@ -507,22 +507,27 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
                 step_measurement_error = np.zeros(step_syndrome.shape, dtype=int)
             step_measurement_errors.append(step_measurement_error)
 
-        if logger.isEnabledFor(logging.DEBUG): # why bother checking this? 
-            logger.debug('run: step_errors={}'.format(step_errors))
-            logger.debug('run: step_syndromes={}'.format(step_syndromes))
-            logger.debug('run: step_measurement_errors={}'.format(step_measurement_errors))
+        if logger.isEnabledFor(logging.DEBUG): # for performance, perhaps?  
+            try: 
+                for i, step_error in enumerate(step_errors): 
+                    logger.debug('run: step_error[{}]:\n{}'.format(i, code.ascii_art(pauli=code.new_pauli(bsf=step_error)))) 
+                for i, step_syndrome in enumerate(step_syndromes): 
+                    logger.debug("run: step_syndrome[{}]:\n{}".format(i, code.ascii_art(syndrome=step_syndrome)))  
+                for i, step_measurement_error in enumerate(step_measurement_errors): 
+                    logger.debug("run: step_measurement_error[{}]:\n{}".format(i, code.ascii_art(syndrome=step_measurement_error))) 
+            except AttributeError: 
+                logger.debug('run: step_errors={}'.format(step_errors))
+                logger.debug('run: step_syndromes={}'.format(step_syndromes))
+                logger.debug('run: step_measurement_errors={}'.format(step_measurement_errors))
 
         # error: sum of errors at each time step
         error = np.bitwise_xor.reduce([residual_error] + step_errors)
-        # print("Residual error with new error") # REMOVE
-        # print(code.ascii_art(pauli=code.new_pauli(bsf=error))) # REMOVE
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug('run: error={}'.format(error))
 
-        # # REMOVE THIS BLOCK 
-        # for i,m in enumerate(step_measurement_errors): 
-        #     print("The {}th measurement error (only one measurement error expected).".format(i)) 
-        #     print(code.ascii_art(syndrome=m)) 
+        if logger.isEnabledFor(logging.DEBUG):
+            try: 
+                logger.debug("run: total error:\n{}".format(code.ascii_art(pauli=code.new_pauli(bsf=error)))) 
+            except AttributeError: 
+                logger.debug('run: error={}'.format(error))
 
         # syndrome: apply measurement_error at times t-1 and t to syndrome at time t 
         step_measurement_errors.append(np.zeros(step_syndrome.shape, dtype=int)) # ensure smooth t=0 bc 
@@ -532,44 +537,51 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
         syndrome[0] = np.bitwise_xor.reduce([syndrome[0], residual_syndrome]) 
         # convert syndrome to 2d numpy array
         syndrome = np.array(syndrome)
+
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug('run: syndrome={}'.format(syndrome))
-        # print("Syndrome:") # REMOVE
-        # print(code.ascii_art(syndrome=syndrome[0])) # REMOVE
+            try: 
+                for i, syndrome_slice in enumerate(syndrome): 
+                    logger.debug("run: syndrome[{}]: \n{}".format(i, code.ascii_art(syndrome=syndrome[i]))) 
+            except AttributeError: 
+                logger.debug('run: syndrome={}'.format(syndrome))
 
         # decoding: boolean or best match recovery operation based on decoder
         ctx = {'error_model': error_model, 'error_probability': error_probability, 'error': error,
                'step_errors': step_errors, 'measurement_error_probability': measurement_error_probability,
                'step_measurement_errors': step_measurement_errors}
-        # convert syndrome to 1d if mode is 'ideal'
         
-        decoding = decoder.decode_ft(code, time_steps, syndrome, **ctx) 
+        recovery = decoder.decode_ft(code, time_steps, syndrome, **ctx) 
+        residual_error = recovery ^ error
 
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug('run: decoding={}'.format(decoding))
-     
-        # check for boolean or recovery operation from decoder
-        if isinstance(decoding, bool):
-            # if decoder returns boolean, that defines success
-            success = decoding
-        else:
-            # otherwise, treat decoder return value as recovery operation
-            recovery = decoding
-            # print("Recovery:") # REMOVE
-            # print(code.ascii_art(pauli=code.new_pauli(bsf=recovery))) # REMOVE 
-            # recovered code
-            residual_error = recovery ^ error
+            try: 
+                logger.debug("run: recovery:\n{}".format(code.ascii_art(pauli=code.new_pauli(bsf=recovery)))) 
+                logger.debug("run: residual_error:\n{}".format(code.ascii_art(pauli=code.new_pauli(bsf=residual_error)))) 
+            except AttributeError: 
+                logger.debug('run: recovery={}'.format(recovery))
+                logger.debug("run: residual_error={}".format(residual_error)) 
+
 
     # success checks
     # compute readout error from measurement in the computational basis. 
-    qubit_readout_error = readout.generate_error(code, measurement_error_probability) 
-    conserved_stabilisers_x = readout.conserved_stabilisers(code)[:, :code.n_k_d[0]] 
-    conserved_stabilisers_z = readout.conserved_stabilisers(code)[:, code.n_k_d[0]:] 
-    conserved_stabilisers_support = conserved_stabilisers_x | conserved_stabilisers_z
+    qubit_readout_error = readout.generate_error(code, measurement_error_probability, rng) 
+    conserved_stabilisers_support = np.apply_along_axis(support, 1, readout.conserved_stabilisers(code)) 
     stabiliser_readout_error = np.dot(qubit_readout_error, conserved_stabilisers_support.T)%2
     readout_syndrome = pt.bsp(residual_error, readout.conserved_stabilisers(code).T) ^ stabiliser_readout_error 
-    logger.debug("run: readout_syndrome={}".format(readout_syndrome))  
-    correction = readout.decode(code, readout_syndrome)  
+    correction = readout.decode(code, readout_syndrome)
+
+    included_readout_syndrome = np.zeros(np.shape(code.stabilizers)[0]) # for logging.  
+    for s, stabiliser in zip(readout_syndrome, readout.conserved_stabilisers(code)): 
+        index = np.where(np.all(code.stabilizers==stabiliser, axis=1))[0][0] 
+        included_readout_syndrome[index] = s 
+    if logger.isEnabledFor(logging.DEBUG): 
+        try: 
+            logger.debug("run: qubit_readout_error ('X' marks qubit measurement errors, not necessarily indicating a Pauli X\n{}".format(
+                code.ascii_art(pauli=code.new_pauli(bsf=np.concatenate((qubit_readout_error, np.zeros(code.n_k_d[0], dtype=int))))))) 
+            logger.debug("run: readout_syndrome (included into full code):\n{}".format(code.ascii_art(syndrome=included_readout_syndrome))) 
+        except AttributeError: 
+            logger.debug("run: qubit_readout_error={}".format(qubit_readout_error)) 
+            logger.debug("run: included_readout_syndrome={}".format(included_readout_syndrome)) 
     # if logger.isEnabledFor(logging.DEBUG): 
     #     logger.debug(f"run: residual_error={residual_error}") 
     #     logger.debug(f"run: qubit_readout_error={qubit_readout_error}")
@@ -601,8 +613,10 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
     #     logger.warning(str(code.ascii_art(pauli=code.new_pauli(bsf=total)))) 
 
 
-    commutes_with_logicals = pt.bsp(residual_error, readout.conserved_logicals(code).T)  
-    success = (commutes_with_logicals == correction) 
+    commutes_with_logicals = pt.bsp(residual_error, readout.conserved_logicals(code).T) 
+    conserved_logical_support = np.apply_along_axis(support, 1, readout.conserved_logicals(code)) 
+    measurement_introduces_error = np.dot(qubit_readout_error, conserved_logical_support.T)%2 
+    success = np.all((commutes_with_logicals + measurement_introduces_error + correction)%2 == 0) 
     # if logger.isEnabledFor(logging.DEBUG):
     #     logger.debug('run: commutes_with_stabilizers={}'.format(commutes_with_stabilizers))
     #     logger.debug('run: commutes_with_logicals={}'.format(commutes_with_logicals))
