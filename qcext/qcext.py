@@ -261,7 +261,7 @@ class PartialDecoder(DecoderFT):
         partial_corrections_included = [] 
         for region in regions: 
             partial_syndrome = self.get_partial_syndrome(code, syndrome, region) 
-            partial_correction = self.partial_decoder_piece.decode(code, partial_syndrome, region) 
+            partial_correction = self.partial_decoder_piece.decode(code, partial_syndrome, region, **kwargs)  
             partial_correction_included = self.include_partial_correction(code, partial_correction, region) 
             partial_corrections_included.append(partial_correction_included)  
         total_correction = np.bitwise_xor.reduce(partial_corrections_included)  
@@ -286,9 +286,8 @@ class PartialDecoder(DecoderFT):
 class IsingDecoderPiece(PartialDecoderPiece): 
     def pauli_to_local_correction(decode): 
         functools.wraps(decode) 
-        def wrapper(*args): 
-            self, code, partial_syndrome, qubit = args
-            pauli = decode(*args) 
+        def wrapper(self, code, partial_syndrome, qubit, **kwargs): 
+            pauli = decode(self, code, partial_syndrome, qubit, **kwargs)   
             region_support = self._get_region_support(code, qubit)
             qubit_index = code.ordered_qubits.index(qubit)  
             correction = np.array([pauli.to_bsf()[i] for i in region_support] 
@@ -297,16 +296,23 @@ class IsingDecoderPiece(PartialDecoderPiece):
         return wrapper 
     
     @pauli_to_local_correction 
-    def decode(self, code, partial_syndrome, qubit): 
+    def decode(self, code, partial_syndrome, qubit, **kwargs): 
         # create a correction at the level of Color666Pauli
         if len(partial_syndrome) != len(self._get_stabiliser_subset(code, qubit)): 
             raise ValueError("{} was not given a partial syndrome when decoding".format(type(self).__name__))  
+        rng = kwargs["rng"] 
         n_stabilisers_each = int(len(partial_syndrome)/2) 
         correction = code.new_pauli() 
-        if sum(partial_syndrome[:n_stabilisers_each]) >= n_stabilisers_each/2: 
+        if sum(partial_syndrome[:n_stabilisers_each]) > n_stabilisers_each/2: 
             correction.site('Z', qubit)  # add Z flip on qubit to correction. 
-        if sum(partial_syndrome[n_stabilisers_each:]) >= n_stabilisers_each/2: 
+        elif sum(partial_syndrome[:n_stabilisers_each]) == n_stabilisers_each/2: 
+            if rng.random() < 0.5: # flip a coin to decide whether to add Z flip to correction.
+                correction.site('Z', qubit) 
+        if sum(partial_syndrome[n_stabilisers_each:]) > n_stabilisers_each/2: 
             correction.site('X', qubit) 
+        elif sum(partial_syndrome[n_stabilisers_each:]) == n_stabilisers_each/2: 
+            if rng.random() < 0.5: 
+                correction.site('X', qubit) 
         return correction 
  
     def _get_stabiliser_subset(self, code, qubit): 
@@ -548,7 +554,7 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
         # decoding: boolean or best match recovery operation based on decoder
         ctx = {'error_model': error_model, 'error_probability': error_probability, 'error': error,
                'step_errors': step_errors, 'measurement_error_probability': measurement_error_probability,
-               'step_measurement_errors': step_measurement_errors}
+               'step_measurement_errors': step_measurement_errors, 'rng': rng} 
         
         recovery = decoder.decode_ft(code, time_steps, syndrome, **ctx) 
         residual_error = recovery ^ error
