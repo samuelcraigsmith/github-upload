@@ -532,13 +532,21 @@ class Color666NoisyReadoutZ(Color666ReadoutZ):
 ##################################################### CORE ##################################################################
 
 def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_probability, 
-    measurement_error_probability, rng):
-    """Implements run_once and run_once_ftp functions."""
+    measurement_error_probability, rng, results="simple", initial_error=None):
+    """Implements run_once and run_once_ftp functions."""       
 
     # generate step_error, step_syndrome and step_measurement_error for each time step
-    residual_error = np.zeros(2*code.n_k_d[0], dtype=int) 
+    if initial_error is not None: 
+        residual_error = initial_error 
+    else: 
+        residual_error = np.zeros(2*code.n_k_d[0], dtype=int) 
 
-    for _ in range(num_cycles):  
+    if results == "full_history": 
+        residual_error_history = np.zeros((num_cycles+1, 2*code.n_k_d[0]), dtype=int)
+        residual_error_history[0,:] = residual_error
+
+    for cycle in range(num_cycles):  
+
         step_errors, step_syndromes, step_measurement_errors = [], [], []
 
         # print("Residual error:") # REMOVE
@@ -607,6 +615,9 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
         
         recovery = decoder.decode_ft(code, time_steps, syndrome, **ctx) 
         residual_error = recovery ^ error
+
+        if results == "full_history": 
+            residual_error_history[cycle+1,:] = residual_error 
 
         if logger.isEnabledFor(logging.DEBUG):
             try: 
@@ -681,12 +692,14 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
 
     data = {
 #        'error_weight': pt.bsf_wt(np.array(step_errors)),
-        'success': success
+        'success': success,
     }
+    if results == "full_history":
+        data["history"] = residual_error_history 
 
     return data
 
-def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_probability, measurement_error_probability, max_runs=None, max_failures=None, random_seed=None): 
+def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_probability, measurement_error_probability, max_runs=None, max_failures=None, random_seed=None, results="simple", initial_error=None): 
 
     if max_runs is None and max_failures is None: 
         max_runs = 1 
@@ -711,8 +724,14 @@ def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_pr
         'physical_error_rate': 0.0,
         'wall_time': 0.0,
         'seed': 0, 
-        'version':qcext.__version__ 
+        'version':qcext.__version__,
     }
+    if results == "full_history": 
+        runs_data["history"] = np.zeros((num_cycles+1, 2*code.n_k_d[0]), dtype=int)
+    if initial_error is not None: 
+        runs_data["initial_error"] = initial_error.tolist() 
+    else: 
+        runs_data["initial_error"] = None
 
     seed_sequence = np.random.SeedSequence(random_seed)
     runs_data['seed'] = seed_sequence.entropy 
@@ -722,15 +741,18 @@ def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_pr
        and (max_failures is None or runs_data['n_fail'] < max_failures)):
         # run simulation
         data = _run_once_ft(code, 1, num_cycles, error_model, decoder, readout, error_probability, measurement_error_probability,
-                         rng)
+                         rng, results=results, initial_error=initial_error)
         # increment run counts
         runs_data['n_run'] += 1
         if data['success']:
             runs_data['n_success'] += 1
         else:
             runs_data['n_fail'] += 1
+        if results == "full_history": 
+            runs_data["history"] += data["history"] 
 
     runs_data['wall_time'] = time.perf_counter() - wall_time_start 
+    runs_data["history"] = runs_data["history"].tolist() # for serialization with JSON 
 
     _add_rate_statistics(runs_data) 
 
