@@ -65,6 +65,17 @@ class Color666CodeNoisy(Color666Code):
         noisy_qubits_indices = [i for i, q in enumerate(self.ordered_qubits) if q not in quiet_qubits] 
         return noisy_qubits_indices
 
+    @property 
+    @functools.lru_cache() 
+    def boundary_qubits(self): 
+        size = self.n_k_d[2] 
+        n_sites = int(1/2 * (3*size-1)) # number of sites along any boundary 
+        boundary1 = [ (i, 0) for i in range(n_sites)] 
+        boundary2 = [(n_sites-1, j) for j in range(n_sites)] 
+        boundary3 = [(i, i) for i in range(n_sites)] 
+        boundary_qubit_indices = [i for i, j in enumerate(self.ordered_qubits) if j in boundary1+boundary2+boundary3] 
+        return boundary_qubit_indices 
+
     @property
     @functools.lru_cache() 
     def ordered_qubits(self): # working
@@ -372,7 +383,6 @@ class IsingDecoderPiece(PartialDecoderPiece):
         z_stabiliser_indices = [int(i + num_stabs/2) for i in x_stabiliser_indices] 
         return x_stabiliser_indices + z_stabiliser_indices 
 
-
 class IsingDecoder(PartialDecoder): # appears to work. 
     def __init__(self): 
         pass 
@@ -389,6 +399,41 @@ class IsingDecoder(PartialDecoder): # appears to work.
     @property
     def label(self):
         return "Ising decoder for 6,6,6 colour code." 
+
+class IsingDecoderPieceNoBoundaryCorrection(IsingDecoderPiece): 
+    def pauli_to_local_correction(decode): 
+        functools.wraps(decode) 
+        def wrapper(self, code, partial_syndrome, qubit, **kwargs): 
+            pauli = decode(self, code, partial_syndrome, qubit, **kwargs)   
+            region_support = self._get_region_support(code, qubit)
+            qubit_index = code.ordered_qubits.index(qubit)  
+            correction = np.array([pauli.to_bsf()[i] for i in region_support] 
+                + [pauli.to_bsf()[i+code.n_k_d[0]] for i in region_support]) 
+            return correction 
+        return wrapper 
+
+    @pauli_to_local_correction
+    def decode(self, code, partial_syndrome, qubit, **kwargs): 
+        # create a correction at the level of Color666Pauli
+        if len(partial_syndrome) != len(self._get_stabiliser_subset(code, qubit)): 
+            raise ValueError("{} was not given a partial syndrome when decoding".format(type(self).__name__))  
+        rng = kwargs["rng"] 
+        n_stabilisers_each = int(len(partial_syndrome)/2) 
+        correction = code.new_pauli() 
+
+        if sum(partial_syndrome[:n_stabilisers_each]) > n_stabilisers_each/2: 
+            correction.site('Z', qubit)  # add Z flip on qubit to correction. 
+
+        if sum(partial_syndrome[n_stabilisers_each:]) > n_stabilisers_each/2: 
+            correction.site('X', qubit) 
+
+        return correction 
+
+class IsingDecoderNoBoundaryCorrection(IsingDecoder): 
+    @property
+    @functools.lru_cache(maxsize=None)
+    def partial_decoder_piece(self):
+        return IsingDecoderPieceNoBoundaryCorrection() 
 
 
 ################################################## READOUT ##################################################################
@@ -752,7 +797,8 @@ def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_pr
             runs_data["history"] += data["history"] 
 
     runs_data['wall_time'] = time.perf_counter() - wall_time_start 
-    runs_data["history"] = runs_data["history"].tolist() # for serialization with JSON 
+    if results == "full_history": 
+        runs_data["history"] = runs_data["history"].tolist() # for serialization with JSON 
 
     _add_rate_statistics(runs_data) 
 
