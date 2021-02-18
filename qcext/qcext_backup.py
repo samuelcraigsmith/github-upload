@@ -261,8 +261,7 @@ class DecoderFT(metaclass=ABCMeta):
 
     @abstractmethod
     def label(self): 
-        """"""
-
+        """""" 
 
 class PartialDecoderPiece(metaclass=ABCMeta): 
 
@@ -561,7 +560,7 @@ class Color666NoisyReadoutZ(Color666ReadoutZ):
                     link_syndrome = syndrome[code.ordered_plaquettes.index(ising_link)] # z-type syndrome 
                     colour = get_assignment(assignments[site], link_syndrome) 
                     assignments[neighbour] = colour 
-#                    print("assigned {} to {}".format(neighbour, colour)) 
+                    # print("assigned {} to {}".format(neighbour, colour)) 
                     get_list[colour].append(neighbour) 
                     assigned_unvisited.append(neighbour) 
 
@@ -736,7 +735,7 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout, er
         logger.debug('run: success={}'.format(success))
 
     data = {
-#        'error_weight': pt.bsf_wt(np.array(step_errors)),
+        #'error_weight': pt.bsf_wt(np.array(step_errors)),
         'success': success,
     }
     if results == "full_history":

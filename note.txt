@@ -1,0 +1,1 @@
+I've verified that same results are returned by refactored qcext compared to v0.5 for the same seed. 
