@@ -1,12 +1,12 @@
-import unittest 
-import logging 
-from itertools import combinations, product 
-from collections import Counter 
-from parameterized import parameterized 
+import unittest
+import logging
+from itertools import combinations, product
+from collections import Counter
+from parameterized import parameterized
 
-from qcext.models.codes import Color666CodeNoisy 
-from qcext.models.decoders import ColorMatchingDecoder 
-from qecsim import paulitools as pt 
+from qcext.models.codes import Color666CodeNoisy
+from qcext.models.decoders import ColorMatchingDecoder
+from qecsim import paulitools as pt
 
 logger = logging.getLogger(__name__) 
 logging.basicConfig(level=logging.WARNING)

@@ -1,0 +1,39 @@
+"""Tools for extracting data from qecsim and qcext for plotting."""
+import math
+
+
+def extract_threshold_data(data_set, c=0.01):
+    """Data set are a list of python dictionaries.
+
+      Notes:
+        - The error bars are attained by treating the fail rate as a normally distributed
+    random variable. This breaks down as f goes to zero. For all f<c, we take f=c to
+    calculate generous error bars. For n=500 runs for each data point, c=0.01 is appropriate.
+    """
+    threshold_data = {}
+    for data_point in data_set:
+        d = str(data_point["n_k_d"][2])
+        if d not in threshold_data.keys():
+            threshold_data[d] = [[], [], []]
+
+        p = data_point["error_probability"]
+        f = data_point["n_fail"]/data_point["n_run"]
+        df = math.sqrt(max(f, c)*(1-max(f, c))/(data_point["n_run"]))
+
+        threshold_data[d][0].append(p)
+        threshold_data[d][1].append(f)
+        threshold_data[d][2].append(df)
+    return threshold_data
+
+# def threshold_plot(data_set):
+#     fig, ax = plt.subplots()
+#     # extract code_distances.
+#     for d in code_distances:
+#         # extract p_series, f_series, err_series.
+#         ax.errorbar(p_series, f_series, err_series, label=d, linestyle="None")
+#     ax.legend()
+#     ax.set_title("Threshold of colour code with restricted error model"
+#                  + "(100% bias, n_cyc=5)")
+#     ax.set_xlabel("Depolarising parameter p")
+#     ax.set_ylabel("Failure rate")
+#     return ax
