@@ -49,21 +49,29 @@ class Color666CodeNoisy(Color666Code):
         return boundary_qubit_indices 
 
     @property
-    @functools.lru_cache() 
-    def ordered_qubits(self): # working
-        """Return a list over tuples qubits in the order specified by the basis of the symplectic space.""" 
-        indices = [] 
-        qubits = [] 
-        for i,j in product(range(self.bound+1), repeat=2): 
-            if self.is_site((i,j)) and self.is_in_bounds((i,j)): 
-                x_ij = self.new_pauli().site('X', (i,j)) 
-                x_ij_bsf = x_ij.to_bsf() 
-                index_ij = np.where(x_ij_bsf==1)[0][0]
-                qubits.append((i, j)) 
-                indices.append(index_ij) 
-        enumeration = sorted(list(zip(indices, qubits)), key=lambda pair: pair[0]) 
-        ordered_qubits = [qubit for index, qubit in enumeration] 
-        return ordered_qubits 
+    @functools.lru_cache()
+    def ordered_qubits(self):
+        """Return a list of qubits sites.
+
+        The ordering of the qubits is specified by the basis of the symplectic
+        space. Qubits are represented as sites (i, j).
+
+        :return ordered_qubits: a list of qubits sites.
+        :rtype: list
+        """
+        indices = []
+        qubits = []
+        for i, j in product(range(self.bound+1), repeat=2):
+            if self.is_site((i, j)) and self.is_in_bounds((i, j)):
+                x_ij = self.new_pauli().site('X', (i, j))
+                x_ij_bsf = x_ij.to_bsf()
+                index_ij = np.where(x_ij_bsf == 1)[0][0]
+                qubits.append((i, j))
+                indices.append(index_ij)
+        enumeration = sorted(list(zip(indices, qubits)),
+                             key=lambda pair: pair[0])
+        ordered_qubits = [qubit for index, qubit in enumeration]
+        return ordered_qubits
 
     @property
     @functools.lru_cache() 

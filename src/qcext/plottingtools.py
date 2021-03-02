@@ -12,6 +12,7 @@ def extract_threshold_data(data_set, c=0.01):
     """
     threshold_data = {}
     for data_point in data_set:
+        data_point = data_point[0]  # qecsim returns a dict in a list.
         d = str(data_point["n_k_d"][2])
         if d not in threshold_data.keys():
             threshold_data[d] = [[], [], []]

@@ -70,8 +70,7 @@ class Color666NoisyReadoutZ(Color666ReadoutZ):
         logical_support = support(self.conserved_logicals(code)[0]) 
         return np.array(np.count_nonzero(error_support & logical_support)%2) # binary array giving corrections to logical operator measurement outcomes. 
 
-    @property 
-    def label(): 
-        return "Colour code logical Z readout assuming 100% bias."  
-
+    @property
+    def label(self):
+        return "Colour code logical Z readout assuming 100% bias."
 

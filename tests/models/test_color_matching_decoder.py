@@ -7,13 +7,15 @@ from parameterized import parameterized
 from qcext.models.codes import Color666CodeNoisy
 from qcext.models.decoders import ColorMatchingDecoder
 from qecsim import paulitools as pt
+import tests.util
 
-logger = logging.getLogger(__name__) 
+logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARNING)
 
-class TestColorMatchingDecoder(unittest.TestCase): 
-    code = Color666CodeNoisy(9) 
-    decoder = ColorMatchingDecoder() 
+
+class TestColorMatchingDecoder(unittest.TestCase):
+    code = Color666CodeNoisy(9)
+    decoder = ColorMatchingDecoder()
 
     def test_unfold_defects_bulk(self): 
         defects = [(5, 3), (6, 2), (7, 4)] 
@@ -36,8 +38,8 @@ class TestColorMatchingDecoder(unittest.TestCase):
         colors = [self.decoder.distance(self.code, site)[1] for site in sites] 
         self.assertEqual(colors, ["red", "green", "green", "red"]) 
 
-    def test_distance_gives_valid_distances(self): 
-        sites = [(1, 1), (4, 1)] 
+    def test_distance_gives_valid_distances(self):
+        sites = [(1, 1), (4, 1)]
         distances = [self.decoder.distance(self.code, site)[0] for site in sites] 
         self.assertGreater(distances[1], distances[0])
 
@@ -52,16 +54,24 @@ class TestColorMatchingDecoder(unittest.TestCase):
 
         self.assertFalse(any(pt.bsp(error^correction, self.code.stabilizers.T)))
 
-    single_qubit_errors = [] 
-    for site, pauli_type in product(product(range(13), repeat=2), "XYZ"): 
-        if code.is_in_bounds(site) and code.is_site(site): 
-            single_qubit_errors.append(("site_{}_type_{}".format(str(site), pauli_type), code.new_pauli().site(pauli_type, site).to_bsf())) 
-    @parameterized.expand(single_qubit_errors) 
-    def test_decode_all_single_qubit_errors(self, _, error): 
-        syndrome = pt.bsp(error, self.code.stabilizers.T) 
-        correction = self.decoder.decode(self.code, syndrome) 
-        self.assertFalse(any(pt.bsp(error^correction, self.code.stabilizers.T)))
-        self.assertFalse(any(pt.bsp(error^correction, self.code.logicals.T))
+    qubits, pauli_types, single_qubit_errors = tests.util.single_qubit_errors(
+        code)
+    args_list = zip(qubits, pauli_types, single_qubit_errors)
+    @parameterized.expand(args_list)
+    def test_decode_all_single_qubit_errors2(self, qubit, pauli_type, error):
+        syndrome = pt.bsp(error, self.code.stabilizers.T)
+        correction = self.decoder.decode(self.code, syndrome)
+        self.assertFalse(
+            any(pt.bsp(error ^ correction, self.code.stabilizers.T)),
+            ("Decoder does not correct a Pauli {} error on site {} to the"
+             " codespace.").format(pauli_type, qubit)
+        )
+        self.assertFalse(
+            any(pt.bsp(error ^ correction, self.code.logicals.T)),
+            ("Decoder does not correct a Pauli {} error on site {} up to"
+             " stabilizers.").format(pauli_type, qubit)
+        )
 
-if __name__ == "__main__": 
-    unittest.main() 
+
+if __name__ == "__main__":
+    unittest.main()
