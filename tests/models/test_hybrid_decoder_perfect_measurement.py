@@ -3,12 +3,21 @@
 import unittest
 from parameterized import parameterized
 from itertools import product
+import logging
 
 import numpy as np
 
 from qecsim import paulitools as pt
 from qcext.models.codes import Color666CodeNoisy
 from qcext.models.decoders import HybridDecoder
+from tests.util import single_qubit_error_histories
+
+
+logger = logging.getLogger(__name__)
+loggerHybridDecoder = logging.getLogger(
+    "qcext.models.decoders._hybrid_decoder_perfect_measurement"
+)
+logging.basicConfig(level=logging.DEBUG)
 
 
 class TestHybridDecoder(unittest.TestCase):
@@ -37,33 +46,38 @@ class TestHybridDecoder(unittest.TestCase):
     """
 
     #  TEST SINGLE QUBIT ERRORS
-    d = 5
+    d = 9
     time_steps = 3
     n_cyc = 1
     code = Color666CodeNoisy(d)
     decoder = HybridDecoder()
     time_steps = 3
-    arguments = []
-    for t in range(time_steps):
-        for site, pauli_type in product(product(range(2*d), repeat=2), "XYZ"):
-            if code.is_in_bounds(site) and code.is_site(site):
-                error = [code.new_pauli().to_bsf()]*3
-                error[t] = code.new_pauli().site(pauli_type, site).to_bsf()
-                arguments.append((t, site, pauli_type, error))
+    times, sites, pauli_types, error_histories = single_qubit_error_histories(
+        code, time_steps, support=code.noisy_qubits)
+    arguments = zip(times, sites, pauli_types, error_histories)
 
     @parameterized.expand(
         arguments
     )
-    def test_all_single_qubit_errors(self, t, site, pauli_type, error):
+    def test_all_single_qubit_errors_noisy_qubits(self, t, site, pauli_type,
+                                                  error_history):
         """Test decoder succeeds for all single-qubit errors.
 
         All single-qubit errors contained in a space-time region defined by a
         code distance d=5 and a time-like dimension t=3.
         """
-        syndrome = [pt.bsp(error[t], self.code.stabilizers.T)
+        logger.setLevel(logging.WARNING)
+        loggerHybridDecoder.setLevel(logging.WARNING)
+
+        logger.debug("Error at {} \n".format(t) + self.code.ascii_art(pauli=self.code.new_pauli(bsf=error_history[t])))
+
+        syndrome = [pt.bsp(error_history[t], self.code.stabilizers.T)
                     for t in range(self.time_steps)]
+
+        logger.debug("Flattened syndrome: \n" + self.code.ascii_art(syndrome=np.bitwise_xor.reduce(syndrome)))
+
         recovery = self.decoder.decode_ft(self.code, self.time_steps, syndrome)
-        total_error = np.bitwise_xor.reduce(error)
+        total_error = np.bitwise_xor.reduce(error_history)
         # RETURNS TO CODESPACE
         self.assertTrue(
             np.all(pt.bsp(recovery ^ total_error,
@@ -78,9 +92,7 @@ class TestHybridDecoder(unittest.TestCase):
             ("Decoder does not correct a Pauli {} error on site {} at time"
              " step {} to stabilizers.").format(pauli_type, site, t)
         )
-
     #  TEST MULTIPLE-QUBIT ERRORS THROUGH TIME
-
 
 
 if __name__ == "__main__":

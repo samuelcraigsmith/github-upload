@@ -62,7 +62,7 @@ class BiasedBitFlipErrorModel(ErrorModel):
     @property
     def label(self):
         """See ..."""
-        return 'Restricted depolarizing error model'
+        return 'Biased bit flip bias={}'.format(self.bias)
 
     def generate(self, code, probability, rng=None):
         """Generate an error on the code."""

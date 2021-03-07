@@ -1,8 +1,8 @@
+"""Generate stabilizer code simulation data for fault-tolerant simulations."""
+
 import numpy as np
 import logging
 import time
-
-logger = logging.getLogger(__name__)
 
 from qecsim import paulitools as pt
 from qecsim.app import _add_rate_statistics
@@ -11,12 +11,58 @@ from qcext.ptext import support
 import qcext  # only require qcext.__version__ to stamp data, not circular.
 
 
-def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
-                 error_probability, rng=None, measurement_error_probability=None,
-                 results="simple", initial_error=None):
-    """Implement run_once and run_once_ftp functions."""
+logger = logging.getLogger(__name__)
+
+
+def run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
+                error_probability, rng=None,
+                measurement_error_probability=None, results="simple",
+                initial_error=None):
+    """Run a fault-tolerant simulation with one cycle of error correction.
+
+    Return value data contains some keys that are unused. They appear for
+    consistency with qecsim.app.run_once_ftp. These keys are "error_weight",
+    "logical_commutations", and "custom_values". Their return values are None.
+
+    :param code: Quantum code over which to run the simulation.
+    :type code: qecsim.model.StabilizerCode
+    :param time_steps: Period of one cycle of fault-tolerant error
+        correction.
+    :type time_steps: int
+    :param num_cycles: Number of cycles of error correction.
+    :type num_cycles: int
+    :param error_model: The error model.
+    :type error_model: qecsim.model.ErrorModel
+    :param decoder: The fault tolerant decoder.
+    :type decoder: qcext.modelext.DecoderFT
+    :param readout: The readout method to measure logical operators.
+    :type readout: qcext.modelext.Readout
+    :param error_probability: Error probability in the interval [0, 1].
+        For a physical interpretation of this parameter, see
+        :meth:`error_model.generate`.
+    :type error_probability: float
+    :param rng: random number generator. Default is None which resolves to
+        np.random.default_rng()
+    :type rng: numpy.random._generator.Generator
+    :param measurement_error_probability: Probability of measurement error.
+        Default is None which resolves to zero. Float in interval [0, 1].
+    :type measurement_error_probability: float
+    :param results: Flag to determine whether full error history is returned.
+    :type results: str
+    :param initial_error: Specify initial error for the run. Used in run_ft
+        to carry over residual error. Default value is None resolves to
+        identity.
+    :type initial_error: np.ndarray
+    :return data: Runs data. Contains keys: "error_weight", "success",
+        "logical_commutations" and "custom_values". Will also contain a key
+        "history" if parameter results is set to "full_history".
+    :rtype data: dict
+    """
     if measurement_error_probability is None:
         measurement_error_probability = error_probability
+
+    # defaults
+    rng = np.random.default_rng() if rng is None else rng
 
     # generate step_error, step_syndrome and step_measurement_error for each time step
     if initial_error is not None:
@@ -165,7 +211,7 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
     commutes_with_logicals = pt.bsp(residual_error, readout.conserved_logicals(code).T) 
     conserved_logical_support = np.apply_along_axis(support, 1, readout.conserved_logicals(code)) 
     measurement_introduces_error = np.dot(qubit_readout_error, conserved_logical_support.T)%2 
-    success = np.all((commutes_with_logicals + measurement_introduces_error + correction)%2 == 0) 
+    success = bool(np.all((commutes_with_logicals + measurement_introduces_error + correction)%2 == 0))
     # if logger.isEnabledFor(logging.DEBUG):
     #     logger.debug('run: commutes_with_stabilizers={}'.format(commutes_with_stabilizers))
     #     logger.debug('run: commutes_with_logicals={}'.format(commutes_with_logicals))
@@ -174,8 +220,10 @@ def _run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
         logger.debug('run: success={}'.format(success))
 
     data = {
-        #'error_weight': pt.bsf_wt(np.array(step_errors)),
-        'success': success,
+        "error_weight": None,
+        "success": success,
+        "logical_commutations": None,
+        "custom_values": None,
     }
     if results == "full_history":
         data["history"] = residual_error_history 
@@ -227,7 +275,7 @@ def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_pr
     while ((max_runs is None or runs_data['n_run'] < max_runs)
        and (max_failures is None or runs_data['n_fail'] < max_failures)):
         # run simulation
-        data = _run_once_ft(code, 1, num_cycles, error_model, decoder, readout,
+        data = run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
                             error_probability, measurement_error_probability=measurement_error_probability,
                             rng=rng, results=results, initial_error=initial_error)
         # increment run counts

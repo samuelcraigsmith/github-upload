@@ -52,8 +52,8 @@ def cli():
 @_model_argument("readout")
 @click.argument("error_probabilities", type=float)
 @click.option("--max-failures", )
-@click.option("--max-runs", )
-@click.option("--measurement-error-probability", )
+@click.option("--max-runs", "-r", type=click.IntRange(min=1), metavar="INT",)
+@click.option("--measurement-error-probability", "-m", type=float, default=None)
 @click.option("--output", "-o", default="-", type=click.Path(allow_dash=True))
 @click.option("--random-seed", )
 def run_ft(code, time_steps, num_cycles, error_model, decoder, readout,

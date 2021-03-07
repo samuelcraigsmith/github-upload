@@ -1,22 +1,27 @@
-from abc import ABCMeta, abstractmethod
-import functools 
+"""Provide abstract interfaces for models."""
 
-import numpy as np 
+from abc import ABCMeta, abstractmethod
+import functools
+import copy
+
+import numpy as np
 from qecsim.error import QecsimError
 from qecsim import paulitools as pt
 
-from qcext.ptext import support 
+from qcext.ptext import support
 
-class DecoderFT(metaclass=ABCMeta): 
+
+class DecoderFT(metaclass=ABCMeta):
     @abstractmethod
     def decode_ft(self, code, time_steps, syndrome, **kwargs):
         """"""
 
     @abstractmethod
-    def label(self): 
-        """""" 
+    def label(self):
+        """"""
 
-class PartialDecoderPiece(metaclass=ABCMeta): 
+
+class PartialDecoderPiece(metaclass=ABCMeta):
 
     # def verify_partial_syndrome(decode):
     #     @functools.wraps(decode)
@@ -77,9 +82,9 @@ class PartialDecoder(DecoderFT):
 
     def decode_ft(self, code, time_steps, syndrome, **kwargs):
         """Decode_ft."""
+        syndrome = copy.copy(syndrome)
         total_correction = []
         for t in range(time_steps):
-            syndrome[t]
             regions = self.get_regions(code)
             partial_corrections_included = []
             for region in regions:
@@ -135,8 +140,21 @@ class Readout(metaclass=ABCMeta):
         """A numpy array of single qubit Paulis giving the measurement basis.""" 
 
     @abstractmethod
-    def generate_error(self, code, measurement_error_rate, rng=None): 
-        """Generate a set of measurement errors.""" 
+    def generate_error(self, code, measurement_error_rate, rng=None):
+        """Generate a set of measurement errors.
+
+        :param code: The quantum code over which readout is performed.
+        :type code: Color666Code
+        :param measurement_error_probability: measurement error probability in
+            [0, 1]
+        :type measurement_error_probability: float
+        :param rng: random number generator.
+        :type rng: numpy.random._generator.Generator or None
+        :return: a binary array signalling the presence of measurement
+            errors. A non-zero entry error[i]==1 indicates an error on
+            measurement measurement_basis[i].
+        :rtype: np.ndarray
+        """
     
     @abstractmethod
     def conserved_stabilisers(self, code): 
@@ -146,11 +164,15 @@ class Readout(metaclass=ABCMeta):
     def conserved_logicals(self, code):
         """A representation of the logical operators being readout that commutes with the measurement basis.""" 
 
-    @abstractmethod # cannot pass measurement outcomes as they are random, only stabilisers containe usable info. 
+    @abstractmethod # cannot pass measurement outcomes as they are random, only stabilisers contain usable info. 
     def decode(self, code, syndrome, **kwargs):
         """Map syndrome data obtained from conserved stabilisers to a logical correction. 
 
-        Returns a binary vector over the logical operators to specify a logical correction. """ 
+        Returns a binary vector over the logical operators to specify a logical correction.
+        This method should be thought of as a global decoding step assuming perfect measurements
+        over a limited set of stabilizers. The reasoning here is that single-qubit measurement 
+        errors in the readout stage look like single-qubit Pauli errors prior to measurement,
+        and hence measurement itself can be thought of as perfect."""
 
     @property
     @abstractmethod

@@ -21,11 +21,18 @@ class Color666CodeNoisy(Color666Code):
     * Also included some lattice methods and properties (hyperboundary, ordered_qubits).
 
     TODO: all public methods should take and return arguments in the form of index sets. 
-    Otherwise implementation details are needed to use the class."""  
+    Otherwise implementation details are needed to use the class.""" 
     def __init__(self, size): 
         super().__init__(size) 
         if size%4 != 1: 
             raise ValueError('{} size must be of form 4*n+1 for integer n.'.format(type(self).__name__))
+        self._size = size
+
+
+    @property
+    def label(self):
+        return "Color 6.6.6 Noisy {}".format(self._size)
+    
 
     @property 
     @functools.lru_cache() 

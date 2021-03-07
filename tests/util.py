@@ -20,7 +20,7 @@ def _single_qubit_errors(code, time_steps, support=None, error_type="history"):
         z_error[qubit+code.n_k_d[0]] = 1
         y_error = x_error ^ z_error
         for pauli_type, error in zip("XZY", [x_error, z_error, y_error]):
-            error_history = [np.zeros(2*code.n_k_d[0])]*time_steps
+            error_history = [np.zeros(2*code.n_k_d[0], dtype=int)]*time_steps
             error_history[t] = error
             error_histories.append(error_history)
             qubits.append(qubit)

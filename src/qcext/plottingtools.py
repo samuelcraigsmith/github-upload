@@ -1,6 +1,30 @@
 """Tools for extracting data from qecsim and qcext for plotting."""
 import math
+import os
+import json
 
+
+def read_data(path):
+    """Return data from all .json files in path as a list of data points.
+
+    Haven't checked that this actually works...
+    """
+    cwd_init = os.getcwd()  # will return to cwd to avoid side effects.
+    os.chdir(path)
+
+    data_files = [data_file for data_file in os.listdir() if
+                  os.path.splitext(data_file)[-1] == ".json"]
+    data_set = []
+    for data_file in data_files:
+        with open(data_file, "r") as f:
+            data_point = json.load(f)
+            if "code" not in data_point[0].keys():
+                raise ValueError("Path contains unrecognisable files.")
+            data_set.append(data_point)
+
+    os.chdir(cwd_init)
+
+    return data_set
 
 def extract_threshold_data(data_set, c=0.01):
     """Data set are a list of python dictionaries.

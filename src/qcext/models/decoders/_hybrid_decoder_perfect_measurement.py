@@ -1,4 +1,5 @@
-"""Implement the HybridDecoder."""
+"""Implement the HybridDecoderPerfectMeasurement."""
+import logging
 
 import numpy as np
 
@@ -7,7 +8,10 @@ from qcext.models.decoders import ColorMatchingDecoder, IsingDecoder
 from qecsim import paulitools as pt
 
 
-class HybridDecoder(DecoderFT):
+logger = logging.getLogger(__name__)
+
+
+class HybridDecoderPerfectMeasurement(DecoderFT):
     """Combines the local Ising decoder with the colour matching decoder.
 
     Not actually fault-tolerant, requires perfect measurement. The fault
@@ -16,10 +20,21 @@ class HybridDecoder(DecoderFT):
     measurement and error correction, like this decoder.
     """
 
-    def __init__(self):
+    def __init__(self, *local_correction):
         """Construct a hybrid decoder."""
         self._global_decoder = ColorMatchingDecoder()
-        self._local_decoder = None
+        self._label = "hybrid decoder perfect measurement"
+        if local_correction[0] == "no_local":
+            self._local_decoder = None
+            self._label += " (no local)"
+            logger.info("Hybrid decoder initiated without local correction.")
+        else:
+            self._local_decoder = IsingDecoder()
+            self._label += " (local)"
+
+    @property
+    def label(self):
+        return self._label
 
     @property
     def global_decoder(self):
@@ -31,25 +46,18 @@ class HybridDecoder(DecoderFT):
         """Return the local decoder."""
         return self._local_decoder
 
-    def decode_ft(self, code, time_steps, syndrome, *kwargs):
+    def decode_ft(self, code, time_steps, syndrome, **kwargs):
         """See :meth:`qcext.modelext.DecoderFT.decode_ft`."""
-        local_corrections = []
-        n_stabs = np.shape(code.stabilizers)[0]
-        syndrome.append(np.zeros(n_stabs, dtype=int))
-        for t in range(time_steps):
-            # TODO: local_correction = local_decode(syndrome[t])
+        if self.local_decoder is not None:
+            local_correction = self.local_decoder.decode_ft(code, time_steps,
+                                                            syndrome)
+        else:
             local_correction = code.new_pauli().to_bsf()
-            local_corrections.append(local_correction)
-            syndrome[t+1] = (syndrome[t+1] ^ syndrome[t] ^ pt.bsp(
-                local_correction, code.stabilizers.T)
-            )
+        leftover_syndrome = (np.bitwise_xor.reduce(syndrome)
+                             ^ pt.bsp(local_correction, code.stabilizers.T))
+        global_correction = self.global_decoder.decode(code, leftover_syndrome)
 
-        global_correction = self.global_decoder.decode(code,
-                                                       syndrome[time_steps])
-
-        return global_correction ^ np.bitwise_xor.reduce(local_corrections)
-
-    @property
-    def label(self):
-        """See :meth:`qcext.modelext.DecoderFT.label`."""
-        return "hybrid decoder perfect measurement"
+        logger.debug("Local correction \n" + code.ascii_art(pauli=code.new_pauli(bsf=local_correction)))
+        logger.debug("Leftover syndrome \n" + code.ascii_art(syndrome=leftover_syndrome))
+        logger.debug("Global correction \n" + code.ascii_art(pauli=code.new_pauli(bsf=global_correction)))
+        return global_correction ^ local_correction

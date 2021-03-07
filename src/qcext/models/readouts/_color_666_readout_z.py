@@ -17,11 +17,11 @@ class Color666ReadoutZ(Readout):
     def conserved_stabilisers(self, code):
         stabilisers = code.stabilizers
         stabilisers_z = stabilisers[ np.all(stabilisers[:, :code.n_k_d[0]]==0, axis=1) ]
-        return stabilisers_z 
+        return stabilisers_z
 
     @functools.lru_cache()
-    def conserved_logicals(self, code):  
-        logicals = code.logicals 
+    def conserved_logicals(self, code):
+        logicals = code.logicals
         logical_zs = logicals[ np.all(logicals[:, :code.n_k_d[0]]==0, axis=1) ]
         return logical_zs
 
