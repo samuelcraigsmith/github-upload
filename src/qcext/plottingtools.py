@@ -1,4 +1,4 @@
-"""Tools for extracting data from qecsim and qcext for plotting."""
+d"""Tools for extracting data from qecsim and qcext for plotting."""
 import math
 import os
 import json
@@ -28,7 +28,7 @@ def read_data(path):
     return data_set
 
 
-def extract_threshold_data(data_set, c=0.01):
+def extract_threshold_data(data_set, x_data=None, x_data_label=None, c=0.01):
     """
     Extract thresholds from a list of data points.
 
@@ -38,8 +38,13 @@ def extract_threshold_data(data_set, c=0.01):
     generous error bars. For n=500 runs for each data point, c=0.01 is
     appropriate.
     """
+
+    # defaults
+    x_data = "error_probability" if x_data is None else x_data
+    if x_data_label is None:
+        x_data_label = x_data if x_data is str else ""
+
     threshold_data = {}
-    unique_data_points = set()
     for data_point in data_set:
         data_point = data_point[0]  # qecsim returns a dict in a list.
         d = str(data_point["n_k_d"][2])
@@ -47,17 +52,13 @@ def extract_threshold_data(data_set, c=0.01):
             threshold_data[d] = [[], [], []]
         p = data_point["error_probability"]
 
-        if (d, p) not in unique_data_points:
-            f = data_point["n_fail"] / data_point["n_run"]
-            df = math.sqrt(max(f, c) * (1 - max(f, c)) / (data_point["n_run"]))
+        f = data_point["n_fail"] / data_point["n_run"]
+        df = math.sqrt(max(f, c) * (1 - max(f, c)) / (data_point["n_run"]))
 
-            threshold_data[d][0].append(p)
-            threshold_data[d][1].append(f)
-            threshold_data[d][2].append(df)
+        threshold_data[d][0].append(p)
+        threshold_data[d][1].append(f)
+        threshold_data[d][2].append(df)
 
-        else:
-            # need to find the entry corresponding to (d, p). This is not fast.
-            pass
     return threshold_data
 
 # def threshold_plot(data_set):
