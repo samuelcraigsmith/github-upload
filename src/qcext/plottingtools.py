@@ -44,6 +44,8 @@ def extract_threshold_data(data_set, x_data=None, x_data_label=None, c=0.01):
     Where x_data is in "error_probability", "time_steps", np.ndarray (custom)
     and defaults to "error_probability". x_data_label defaults to x_data if
     x_data is a string or the empty string.
+
+    Return a list of threshold data and a list of labels for the data.
     """
 
     # defaults
@@ -56,7 +58,7 @@ def extract_threshold_data(data_set, x_data=None, x_data_label=None, c=0.01):
         data_point = data_point[0]  # qecsim returns a dict in a list.
         d = str(data_point["n_k_d"][2])
         if d not in threshold_data.keys():
-            threshold_data[d] = {x_data_label: [], "f": [], "df": []}
+            threshold_data[d] = [[], [], []]
 
         # index into x_data instead of zip due to conditional nature of x_data.
         x = data_point[x_data] if type(x_data) is str else x_data[i]
@@ -64,11 +66,11 @@ def extract_threshold_data(data_set, x_data=None, x_data_label=None, c=0.01):
         f = data_point["n_fail"] / data_point["n_run"]
         df = math.sqrt(max(f, c) * (1 - max(f, c)) / (data_point["n_run"]))
 
-        threshold_data[d][x_data_label].append(x)
-        threshold_data[d]["f"].append(f)
-        threshold_data[d]["df"].append(df)
+        threshold_data[d][0].append(x)
+        threshold_data[d][1].append(f)
+        threshold_data[d][2].append(df)
 
-    return threshold_datax
+    return threshold_data, [x_data_label, "f", "df"]
 
 # def threshold_plot(data_set):
 #     fig, ax = plt.subplots()
