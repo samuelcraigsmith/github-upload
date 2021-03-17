@@ -41,7 +41,7 @@ def extract_threshold_data(data_set, x_data=None, x_data_label=None, c=0.01):
     generous error bars. For n=500 runs for each data point, c=0.01 is
     appropriate.
 
-    Where x_data is in "error_probability", "time_steps", np.ndarray (custom)
+    Where x_data is in "error_probability", "time_steps", list (custom)
     and defaults to "error_probability". x_data_label defaults to x_data if
     x_data is a string or the empty string.
 
@@ -53,22 +53,38 @@ def extract_threshold_data(data_set, x_data=None, x_data_label=None, c=0.01):
     if x_data_label is None:
         x_data_label = x_data if type(x_data) is str else ""
 
+    xs = {}
+    n_runs = {}
+    n_fails = {}
     threshold_data = {}
     for i, data_point in enumerate(data_set):
         data_point = data_point[0]  # qecsim returns a dict in a list.
         d = str(data_point["n_k_d"][2])
         if d not in threshold_data.keys():
+            xs[d] = []
+            n_runs[d] = []
+            n_fails[d] = []
             threshold_data[d] = [[], [], []]
 
         # index into x_data instead of zip due to conditional nature of x_data.
         x = data_point[x_data] if type(x_data) is str else x_data[i]
+        try:
+            i = xs[d].index(x)
+            n_runs[d][i] += data_point["n_run"]
+            n_fails[d][i] += data_point["n_fail"]
+        except ValueError:
+            xs[d].append(x)
+            n_runs[d].append(data_point["n_run"])
+            n_fails[d].append(data_point["n_fail"])
 
-        f = data_point["n_fail"] / data_point["n_run"]
-        df = math.sqrt(max(f, c) * (1 - max(f, c)) / (data_point["n_run"]))
-
-        threshold_data[d][0].append(x)
-        threshold_data[d][1].append(f)
-        threshold_data[d][2].append(df)
+    for d in threshold_data.keys():
+        threshold_data[d][0] = xs[d]
+        threshold_data[d][1] = [nf / nr for nr, nf in
+                                zip(n_runs[d], n_fails[d])]
+        threshold_data[d][2] = [
+            math.sqrt(max(f, c) * (1 - max(f, c)) / nr)
+            for f, nr in zip(threshold_data[d][1], n_runs[d])
+        ]
 
     return threshold_data, [x_data_label, "f", "df"]
 
