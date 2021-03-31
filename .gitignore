@@ -1,22 +1,32 @@
 # Distribution and packaging
 *.egg
-*.egg-info/ 
-build/ 
-dist/ 
+*.egg-info/
+build/
+dist/
 
 # Byte-compiled / optimized / DLL files
-qcext/__pycache__/ 
+qcext/__pycache__/
+tests/__pycache__/test_plottingtools.cpython-38.pyc
+tests/models/__pycache__/
 
-# Virtual environment 
-venv 
-qecsimext 
+# Virtual environment
+venv
+qecsimext
 
+#DS store
+.DS_Store
+src/.DS_Store
+src/qcext/.DS_Store
+src/qcext/models/.DS_Store
 
-# Testing 
+# Testing
 scratch/
 openIDLE.bat
+speed_test.py
 
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
 #   intended to run in multiple environments; otherwise, check them in:
 .python-version
+
+
