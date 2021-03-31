@@ -5,7 +5,8 @@ build/
 dist/
 
 # Byte-compiled / optimized / DLL files
-qcext/__pycache__/
+src/qcext/__pycache__/*
+src/qcext/__pycache__/appext.cpython-38.pyc
 tests/__pycache__/test_plottingtools.cpython-38.pyc
 tests/models/__pycache__/
 
