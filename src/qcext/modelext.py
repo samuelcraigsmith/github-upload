@@ -55,11 +55,12 @@ class PartialDecoderPiece(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    @functools.lru_cache() 
+    @functools.lru_cache()
     def _get_stabiliser_subset(self, code, region):
         """Return the indices of the stabilisers that are intended to be specified by region."""
 
-    def _get_region_support(self, code, region):
+    @functools.lru_cache(maxsize=None)
+    def _get_region_support(self, code, region):  #!!!
         """Return the indices of the qubits on which the region has support"""
         stabiliser_subset = self._get_stabiliser_subset(code, region)
         stabilisers = [code.stabilizers[i, :] for i in stabiliser_subset]
@@ -102,13 +103,13 @@ class PartialDecoder(DecoderFT):
         total_correction = np.bitwise_xor.reduce(total_correction)  # flatten
         return total_correction
 
-    def get_partial_syndrome(self, code, syndrome, region):
+    def get_partial_syndrome(self, code, syndrome, region):  #!!!
         """Return the syndrome data for stabilisers contained in region."""
         stabiliser_subset = self.partial_decoder_piece._get_stabiliser_subset(code, region)
         return [syndrome[i] for i in stabiliser_subset]
 
-    def include_partial_correction(self, code, correction, region):
-        """Include the partial correction into a Pauli operator over the code.""" 
+    def include_partial_correction(self, code, correction, region):  #!!!
+        """Include the partial correction into a Pauli operator over the code."""
         region_support = self.partial_decoder_piece._get_region_support(code, region)
         global_correction = np.zeros(2*code.n_k_d[0], dtype=int)
         for q, cx in zip(region_support, correction[:len(region_support)]):
@@ -118,26 +119,26 @@ class PartialDecoder(DecoderFT):
         return global_correction
 
 
-class Readout(metaclass=ABCMeta): 
-    @functools.lru_cache(maxsize=None) 
-    def validate(self, code): 
-        # ensure that the measurement basis consists only of single-qubit operators. 
-        if not np.all(np.apply_along_axis(pt.bsf_wt, axis=1, arr=self.measurement_basis(code)) == 1):  
-            raise QecsimError("{} has an invalid measurement basis.".format(type(self).__name__)) 
-        # ensure that the conserved stabilisers commutes with the measurement basis. 
-        if not np.all(pt.bsp(self.conserved_stabilisers(code), self.measurement_basis(code).T) == 0): 
-            raise QecsimError("{} has conserved stabilisers that do not commute with the measurement basis.".format(type(self).__name__)) 
-        # ensure that the logical representative commutes with the measurement basis. 
-        if not np.all(pt.bsp(self.conserved_logicals(code), self.measurement_basis(code).T) == 0): 
-            raise QecsimError("{} has logicals that do not commute with the measurement basis".format(type(self).__name__)) 
+class Readout(metaclass=ABCMeta):
+    @functools.lru_cache(maxsize=None)
+    def validate(self, code):
+        # ensure that the measurement basis consists only of single-qubit operators.
+        if not np.all(np.apply_along_axis(pt.bsf_wt, axis=1, arr=self.measurement_basis(code)) == 1):
+            raise QecsimError("{} has an invalid measurement basis.".format(type(self).__name__))
+        # ensure that the conserved stabilisers commutes with the measurement basis.
+        if not np.all(pt.bsp(self.conserved_stabilisers(code), self.measurement_basis(code).T) == 0):
+            raise QecsimError("{} has conserved stabilisers that do not commute with the measurement basis.".format(type(self).__name__))
+        # ensure that the logical representative commutes with the measurement basis.
+        if not np.all(pt.bsp(self.conserved_logicals(code), self.measurement_basis(code).T) == 0):
+            raise QecsimError("{} has logicals that do not commute with the measurement basis".format(type(self).__name__))
         # ensure that the logical representative commutes with the conserved stabilisers.
-        if not np.all(pt.bsp(self.conserved_logicals(code), self.conserved_stabilisers(code).T) == 0): 
-            raise QecsimError("{} has logicals that do not commute with stabilisers.".format(type(self).__name__))  
-        return 
+        if not np.all(pt.bsp(self.conserved_logicals(code), self.conserved_stabilisers(code).T) == 0):
+            raise QecsimError("{} has logicals that do not commute with stabilisers.".format(type(self).__name__))
+        return
 
     @abstractmethod
-    def measurement_basis(self, code): 
-        """A numpy array of single qubit Paulis giving the measurement basis.""" 
+    def measurement_basis(self, code):
+        """A numpy array of single qubit Paulis giving the measurement basis."""
 
     @abstractmethod
     def generate_error(self, code, measurement_error_rate, rng=None):
@@ -155,22 +156,22 @@ class Readout(metaclass=ABCMeta):
             measurement measurement_basis[i].
         :rtype: np.ndarray
         """
-    
+
     @abstractmethod
-    def conserved_stabilisers(self, code): 
-        """A list of generators for the set of stabilisers that commute with the measurement basis.""" 
+    def conserved_stabilisers(self, code):
+        """A list of generators for the set of stabilisers that commute with the measurement basis."""
 
     @abstractmethod
     def conserved_logicals(self, code):
-        """A representation of the logical operators being readout that commutes with the measurement basis.""" 
+        """A representation of the logical operators being readout that commutes with the measurement basis."""
 
-    @abstractmethod # cannot pass measurement outcomes as they are random, only stabilisers contain usable info. 
+    @abstractmethod # cannot pass measurement outcomes as they are random, only stabilisers contain usable info.
     def decode(self, code, syndrome, **kwargs):
-        """Map syndrome data obtained from conserved stabilisers to a logical correction. 
+        """Map syndrome data obtained from conserved stabilisers to a logical correction.
 
         Returns a binary vector over the logical operators to specify a logical correction.
         This method should be thought of as a global decoding step assuming perfect measurements
-        over a limited set of stabilizers. The reasoning here is that single-qubit measurement 
+        over a limited set of stabilizers. The reasoning here is that single-qubit measurement
         errors in the readout stage look like single-qubit Pauli errors prior to measurement,
         and hence measurement itself can be thought of as perfect."""
 

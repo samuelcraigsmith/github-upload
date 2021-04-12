@@ -5,9 +5,7 @@ build/
 dist/
 
 # Byte-compiled / optimized / DLL files
-qcext/__pycache__/
-tests/__pycache__/test_plottingtools.cpython-38.pyc
-tests/models/__pycache__/
+*__pycache__*
 
 # Virtual environment
 venv

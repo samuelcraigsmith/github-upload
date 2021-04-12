@@ -17,7 +17,7 @@ class IsingDecoderPiece(PartialDecoderPiece):
 
     def pauli_to_local_correction(decode):
         functools.wraps(decode)
-        def wrapper(self, code, partial_syndrome, qubit, **kwargs):
+        def wrapper(self, code, partial_syndrome, qubit, **kwargs):  #!!!
             pauli = decode(self, code, partial_syndrome, qubit, **kwargs)
             region_support = self._get_region_support(code, qubit)
             qubit_index = code.ordered_qubits.index(qubit)
@@ -51,12 +51,13 @@ class IsingDecoderPiece(PartialDecoderPiece):
                 correction.site('X', qubit)
         return correction
 
-    def _get_stabiliser_subset(self, code, qubit):
-        plaquettes = code.ising_star(qubit)
+    @functools.lru_cache(maxsize=None)
+    def _get_stabiliser_subset(self, code, qubit):  #!!!
+        plaquettes = code.ising_star(qubit)  # fast
         plaquette_indices = [i for i, p in enumerate(code.ordered_plaquettes) if p in plaquettes]
         num_stabs = np.shape(code.stabilizers)[0]
         x_stabiliser_indices = plaquette_indices
-        z_stabiliser_indices = [int(i + num_stabs/2) for i in x_stabiliser_indices]
+        z_stabiliser_indices = [int(i + num_stabs/2) for i in x_stabiliser_indices]  # list comprehension? could be slow.
         return x_stabiliser_indices + z_stabiliser_indices
 
 

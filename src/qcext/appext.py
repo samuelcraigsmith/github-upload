@@ -80,6 +80,8 @@ def run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
 
         # print("Residual error:") # REMOVE
         # print(code.ascii_art(pauli=code.new_pauli(bsf=residual_error))) # REMOVE
+
+        residual_syndrome = pt.bsp(residual_error, code.stabilizers.T)
         for _ in range(time_steps):
             # step_error: random e rror based on error probability
             step_error = error_model.generate(code, error_probability, rng)
@@ -87,7 +89,6 @@ def run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
             # step_syndrome: stabilizers that do not commute with the error
             step_syndrome = pt.bsp(step_error, code.stabilizers.T)
             step_syndromes.append(step_syndrome)
-            residual_syndrome = pt.bsp(residual_error, code.stabilizers.T) 
             # step_measurement_error: random syndrome bit flips based on measurement_error_probability
             if measurement_error_probability:
                 step_measurement_error = rng.choice(
@@ -177,14 +178,14 @@ def run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
         except AttributeError:
             logger.debug("run: qubit_readout_error={}".format(qubit_readout_error))
             logger.debug("run: included_readout_syndrome={}".format(included_readout_syndrome))
-    # if logger.isEnabledFor(logging.DEBUG): 
-    #     logger.debug(f"run: residual_error={residual_error}") 
+    # if logger.isEnabledFor(logging.DEBUG):
+    #     logger.debug(f"run: residual_error={residual_error}")
     #     logger.debug(f"run: qubit_readout_error={qubit_readout_error}")
     #     logger.debug(f"run: stabiliser_readout_error={stabiliser_readout_error}")
     #     logger.debug(f"run: readout_syndrome={readout_syndrome}")
     #     logger.debug(f"run: correction={correction}")
 
-    # sanity checks 
+    # sanity checks
     # commutes_with_stabilizers = np.all(pt.bsp(recovered, readout.conserved_stabilisers(code).T) == 0)
     # if not commutes_with_stabilizers:
     #     log_data = {
@@ -200,17 +201,17 @@ def run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
     #         'step_measurement_errors': [pt.pack(v) for v in step_measurement_errors],
     #     }
     #     logger.warning('RECOVERY DOES NOT RETURN TO (+1)-EIGENSPACE OF CONSERVED STABILIZERS: {}'.format(json.dumps(log_data, sort_keys=True)))
-    #     logger.warning(str(code.ascii_art(pauli=code.new_pauli(bsf=residual_error)))) 
-    #     logger.warning(str(code.ascii_art(pauli=code.new_pauli(bsf=correction))))     
-    #     meas_err_as_qubit_err = np.concatenate([qubit_readout_error, [0]*code.n_k_d[0]])  
-    #     logger.warning(str(code.ascii_art(pauli=code.new_pauli(bsf=meas_err_as_qubit_err)))) 
-    #     total = meas_err_as_qubit_err ^ residual_error ^ correction 
-    #     logger.warning(str(code.ascii_art(pauli=code.new_pauli(bsf=total)))) 
+    #     logger.warning(str(code.ascii_art(pauli=code.new_pauli(bsf=residual_error))))
+    #     logger.warning(str(code.ascii_art(pauli=code.new_pauli(bsf=correction))))
+    #     meas_err_as_qubit_err = np.concatenate([qubit_readout_error, [0]*code.n_k_d[0]])
+    #     logger.warning(str(code.ascii_art(pauli=code.new_pauli(bsf=meas_err_as_qubit_err))))
+    #     total = meas_err_as_qubit_err ^ residual_error ^ correction
+    #     logger.warning(str(code.ascii_art(pauli=code.new_pauli(bsf=total))))
 
 
-    commutes_with_logicals = pt.bsp(residual_error, readout.conserved_logicals(code).T) 
-    conserved_logical_support = np.apply_along_axis(support, 1, readout.conserved_logicals(code)) 
-    measurement_introduces_error = np.dot(qubit_readout_error, conserved_logical_support.T)%2 
+    commutes_with_logicals = pt.bsp(residual_error, readout.conserved_logicals(code).T)
+    conserved_logical_support = np.apply_along_axis(support, 1, readout.conserved_logicals(code))
+    measurement_introduces_error = np.dot(qubit_readout_error, conserved_logical_support.T)%2
     success = bool(np.all((commutes_with_logicals + measurement_introduces_error + correction)%2 == 0))
     # if logger.isEnabledFor(logging.DEBUG):
     #     logger.debug('run: commutes_with_stabilizers={}'.format(commutes_with_stabilizers))
@@ -226,11 +227,11 @@ def run_once_ft(code, time_steps, num_cycles, error_model, decoder, readout,
         "custom_values": None,
     }
     if results == "full_history":
-        data["history"] = residual_error_history 
+        data["history"] = residual_error_history
 
     return data
 
-def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_probability, measurement_error_probability=None, max_runs=None, max_failures=None, random_seed=None, results="simple", initial_error=None): 
+def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_probability, measurement_error_probability=None, max_runs=None, max_failures=None, random_seed=None, results="simple", initial_error=None):
 
     if max_runs is None and max_failures is None:
         max_runs = 1
@@ -261,16 +262,16 @@ def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_pr
         'version': qcext.__version__,
         'initial_error': None
     }
-    if results == "full_history": 
+    if results == "full_history":
         runs_data["history"] = np.zeros((num_cycles+1, 2*code.n_k_d[0]), dtype=int)
-    if initial_error is not None: 
-        runs_data["initial_error"] = initial_error.tolist() 
+    if initial_error is not None:
+        runs_data["initial_error"] = initial_error.tolist()
     else:
         runs_data["initial_error"] = None
 
     seed_sequence = np.random.SeedSequence(random_seed)
-    runs_data['seed'] = seed_sequence.entropy 
-    rng = np.random.default_rng(seed_sequence) 
+    runs_data['seed'] = seed_sequence.entropy
+    rng = np.random.default_rng(seed_sequence)
 
     while ((max_runs is None or runs_data['n_run'] < max_runs)
        and (max_failures is None or runs_data['n_fail'] < max_failures)):
@@ -284,13 +285,13 @@ def run_ft(code, time_steps, num_cycles, error_model, decoder, readout, error_pr
             runs_data['n_success'] += 1
         else:
             runs_data['n_fail'] += 1
-        if results == "full_history": 
-            runs_data["history"] += data["history"] 
+        if results == "full_history":
+            runs_data["history"] += data["history"]
 
-    runs_data['wall_time'] = time.perf_counter() - wall_time_start 
-    if results == "full_history": 
-        runs_data["history"] = runs_data["history"].tolist() # for serialization with JSON 
+    runs_data['wall_time'] = time.perf_counter() - wall_time_start
+    if results == "full_history":
+        runs_data["history"] = runs_data["history"].tolist() # for serialization with JSON
 
-    _add_rate_statistics(runs_data) 
+    _add_rate_statistics(runs_data)
 
-    return runs_data 
+    return runs_data
