@@ -4,7 +4,7 @@ import logging
 import numpy as np
 
 from qcext.modelext import DecoderFT
-from qcext.models.decoders import ColorMatchingDecoder, IsingDecoder
+from qcext.models.decoders import ColorMatchingDecoder, FastIsingDecoder
 from qecsim import paulitools as pt
 
 
@@ -29,7 +29,7 @@ class HybridDecoderPerfectMeasurement(DecoderFT):
             self._label += " (no local)"
             logger.info("Hybrid decoder initiated without local correction.")
         else:
-            self._local_decoder = IsingDecoder()
+            self._local_decoder = FastIsingDecoder()
             self._label += " (local)"
 
     @property
